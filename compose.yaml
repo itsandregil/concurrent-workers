@@ -10,9 +10,31 @@ services:
     ports:
       - 5432:5432
     healthcheck:
-      test: ["CMD", "pg_isready"]
+      test:
+        ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  migrations:
+    image: ghcr.io/kukymbr/goose-docker:3.27.0
+    restart: no
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - GOOSE_DRIVER=postgres
+      - GOOSE_DBSTRING=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    volumes:
+      - ./sql/schema:/migrations
+
+  worker:
+    image: thcodex/worker
+    env_file: .env
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
 volumes:
   db-data:
